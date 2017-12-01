@@ -7,6 +7,10 @@
 #include "qjoystick.h"
 #include <QTimer>
 #include <QTime>
+#include <QByteArray>
+#include <QDir>
+#include <QFile>
+#include <QDate>
 
 #include "ui_mainwindow.h"
 
@@ -28,6 +32,7 @@ private slots:
     void updateData();
     void pollJoystick();
     void secTimer_timeout();
+    void readData();
 
 private:
   Ui::MainWindow ui;
@@ -37,6 +42,9 @@ private:
 
   void initJoystick();
   void resetUI();
+  void TxData(uint8_t dat1, uint8_t dat2);
+  void createLogfile();
+  void writeLog(QString entry);
 
   int joysavail;
   int current_joystick;
@@ -51,7 +59,7 @@ private:
   QList<joydata*> joystick;
   QTimer *joyTimer;
   bool connectedToRover;
-  char payload[4];
+  QByteArray payload;
 };
 
 #endif

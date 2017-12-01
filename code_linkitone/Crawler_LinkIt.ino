@@ -7,7 +7,7 @@
 #include <Arduino.h>
 
 // COM Baud
-#define baudRate 9600
+#define baudRate 96000
 #define baudRate1 115200
 
 // Pinout LinkIt One

@@ -36,7 +36,7 @@ FIND_PACKAGE(Qt5Network
 		REQUIRED )	
 
 FIND_LIBRARY(SDL_LIB NAMES 
-				SDL 
+				SDL
 			 PATHS
 			 /SDL/bin/
 			 NO_DEFAULT_PATH

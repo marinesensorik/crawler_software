@@ -1,5 +1,4 @@
 #include "qjoystick.h"
-
 #include <QDebug>
 
 #define POLL_INTERVAL 40
@@ -36,13 +35,12 @@ int QJoystick::joystickNumButtons(int js)
     return (SDL_JoystickNumButtons(m_joystick));
 }
 
-
 void QJoystick::setJoystick(int js)
 {
     Q_ASSERT(js < availableJoysticks());
     Q_ASSERT(js >= 0);
 
-    SDL_JoystickClose(m_joystick);
+    if(m_joystick==nullptr)SDL_JoystickClose(m_joystick);
     m_joystick = SDL_JoystickOpen(js);
 }
 
@@ -50,7 +48,7 @@ QJoystick::~QJoystick()
 {
     axis.clear();
     buttons.clear();
-    SDL_JoystickClose(m_joystick);
+    if(m_joystick==nullptr)SDL_JoystickClose(m_joystick);
     SDL_QuitSubSystem(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK);
     this->deleteLater();
 }
@@ -66,10 +64,8 @@ void QJoystick::getdata()
     axis.clear();
     buttons.clear();
 
-
-        SDL_Event event;
-
-     SDL_PollEvent(&event);
+    SDL_Event event;
+    SDL_PollEvent(&event);
 
     for(int i=0;i<SDL_JoystickNumAxes(m_joystick);i++)
     {
@@ -80,5 +76,4 @@ void QJoystick::getdata()
     {
         buttons.append(SDL_JoystickGetButton(m_joystick,i));
     }
-
 }

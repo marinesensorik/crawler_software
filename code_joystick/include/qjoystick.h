@@ -4,7 +4,6 @@
 #include <QObject>
 #include <QString>
 #include <QList>
-
 #include "SDL/SDL.h"
 
 

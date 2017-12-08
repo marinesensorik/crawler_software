@@ -4,37 +4,15 @@
  Author:	Jonas Mueller
 */
 
+#define EXTERN
+
 #include <Arduino.h>
-
-// COM Baud
-#define baudRate 9600
-#define baudRate1 115200
-
-// Pinout LinkIt One
-#define tx 0
-#define rx 1
-#define dirR 2
-#define dirL 8
-#define pwmlR 4
-#define pwmlL 10
-#define pwmhR 3
-#define pwmhL 9
-
-// Movement Commands
-#define forward  1
-#define backward 2
-#define left 4
-#define forwardLeft 5
-#define right 8
-#define forwardRight 9
-#define stopp 16
-#define reset 255
-
-#define directionfwd LOW
-#define directionbwd HIGH
-
-// Startbyte
-#define startByte	240
+#include <Wire.h>
+#include <math.h>
+#include "Crawler_LinkIt.h"
+#include "I2C_CMPS11.h"
+#include "MS5803_14BA_avrlib.h"
+#include "i2c_functions.h"
 
 // PWM Signal Parameter
 int cycle = 254;                              // Anzahl der PWM Schritte
@@ -51,12 +29,29 @@ int serialFlag = 0;
 int zustand = 1;
 
 // Communication Timeout 
-unsigned long timer = 0;   
-unsigned long timeStamp = 0;
-int timeOut = 2000;           // ms
+uint32_t timer = 0;   
+uint32_t timeStamp = 0;
+uint32_t timeOut = 2000;           // ms
+
+// Depth Sensor Coeff
+uint16_t depth_SENS = 0;
+uint16_t depth_OFF = 0;
+uint16_t depth_TCO = 0;
+uint16_t depth_TCS = 0;
+uint16_t depth_TEMPS = 0;
+uint16_t depth_T = 0;
 
 void setup()                 
 {
+	Reg_Sensors = 0;
+	voltage=0;
+	current=0;
+	pressure=0;
+	watertemperature=0;
+	pitch=0;
+	roll=0;
+	bearing=0;
+
 	pinMode(dirR, OUTPUT);
 	pinMode(dirL, OUTPUT);
 	pinMode(pwmlR, OUTPUT);
@@ -70,6 +65,15 @@ void setup()
 
 	Serial.begin(baudRate);     // COM CDC
 	Serial1.begin(baudRate1);   // COM BeagleBone
+
+	Wire.begin();
+
+	checkSensors();
+
+	delay(250);
+
+	if (Reg_Sensors & REG_SENSORS_MS5803)
+		initDepth();
 }
 
 void loop()
@@ -82,9 +86,9 @@ void loop()
 	{
 		incomingByte = Serial1.read();
 
-		Serial.print("Byte received: ");  
+		Serial.print("Byte received: ");	
 		Serial.println(incomingByte, DEC);
-
+		
 		switch (zustand)                               
 		{
 
@@ -117,22 +121,24 @@ void loop()
 
 			checkSummeErrechnet = movement^velocity;
 
-			if (checkSumme == checkSummeErrechnet) 
+			if (checkSumme == checkSummeErrechnet)
 			{
-				serialFlag = 1;                      
+				serialFlag = 1;
 				Serial.println("Success");
-				timer = millis();                  
+				timer = millis();
 			}
-			else 
+			else
 			{
 				// COM Error Handling
-				zustand = 1;
 				Serial.println("COM Error");
 				onError();
 			}
+
+			zustand = 1;
 		break;
 
 		default:
+			zustand = 1;
 		break;
 		}
 
@@ -140,16 +146,24 @@ void loop()
 		Serial.println(serialFlag);  
 	} 
 
-	// Motor Control
-	driveCrawler(movement, velocity);
+	if (serialFlag == 1)
+	{
+		// Motor Control
+		driveCrawler(movement, velocity);
+
+		serialFlag = 0;
+	}
 
 	// Timeout
-	timeStamp = millis(); 
-	if ((timeStamp - timer) > (unsigned long)timeOut) 
+	timeStamp = millis();
+	if ((timeStamp - timer) > timeOut)
 	{
 		timer = timeStamp;
 		Serial.println("Timeout");
 		onError();
+				
+					// DEBUG
+					getSensorData();
 	}
 }
 
@@ -170,50 +184,18 @@ void driveCrawler(byte Movement, int Velocity)
 		break;
 
 		case forward:
-			if (serialFlag == 1)
-			{
-				for (int x = 0; x <= Velocity; x++)
-				{
-					setMotors(directionfwd, directionfwd, x, x);
-					delay(10); 
-				}
-			}
 			setMotors(directionfwd, directionfwd, Velocity, Velocity);
 		break;
 
 		case backward:
-			if (serialFlag == 1)
-			{
-				for (int x = 0; x <= Velocity; x++)
-				{
-					setMotors(directionbwd, directionbwd, x, x);
-					delay(10); 
-				}
-			}
 			setMotors(directionbwd, directionbwd, Velocity, Velocity);			
 		break;
 
 		case left:
-			if (serialFlag == 1)
-			{
-				for (int x = 0; x <= Velocity; x++)
-				{
-					setMotors(directionfwd, directionbwd, x, x);
-					delay(10); 
-				}
-			}
 			setMotors(directionfwd, directionbwd, Velocity, Velocity);
 		break;
 
 		case right:
-			if (serialFlag == 1)
-			{
-				for (int x = 0; x <= Velocity; x++)
-				{
-					setMotors(directionbwd, directionfwd, x, x);
-					delay(10); 
-				}
-			}
 			setMotors(directionbwd, directionfwd, Velocity, Velocity);
 		break;
 
@@ -231,4 +213,93 @@ void setMotors(int DirR, int DirL, int PWMHR, int PWMHL)
 	digitalWrite(pwmlR, HIGH);
 	analogWriteAdvance(pwmhL, sourceClock, divider, cycle, PWMHL);
 	analogWriteAdvance(pwmhR, sourceClock, divider, cycle, PWMHR);
+}
+
+uint16_t readBattVoltage()
+{
+	double vol = 0;
+	uint16_t val = analogRead(batt_voltage);
+	vol = val*ADC_RES_mV*4.0;
+	return (uint16_t)vol;
+}
+
+uint32_t readCurrent()
+{
+	uint16_t val = analogRead(pin_current);
+	double vol = (val*ADC_RES_mV) - (VREF_mV / 10);
+	if (vol < 0.0)vol = 0.0;
+	uint32_t cur = (vol * 10) / 2;
+	return cur;
+}
+
+void getSensorData()
+{
+	if (Reg_Sensors & REG_SENSORS_CMPS11)
+	{
+		// Compass Unit found on TWI
+		bearing = (uint16_t)(CMPS11_getBearing()*10.0);
+		pitch = CMPS11_getPitch();
+		roll = CMPS11_getRoll();
+
+		Serial.print("Bearing: ");
+		Serial.println(bearing, DEC);
+		Serial.print("Pitch: ");
+		Serial.println(pitch, DEC);
+		Serial.print("Roll: ");
+		Serial.println(roll, DEC);
+	}
+
+	if (Reg_Sensors & REG_SENSORS_MS5803)
+	{
+		// Pressure Unit found on TWI
+		watertemperature = (int32_t)(MS5803_calculate_Temp(depth_T, depth_TEMPS, MS5803_CMD_D2_256, MS5803_CTIME_256)*1000.0);
+		pressure = MS5803_calculate_Pressure(depth_SENS, depth_OFF, depth_T, depth_TCO, depth_TCS, MS5803_CMD_D1_256, MS5803_CMD_D2_256, MS5803_CTIME_256, MS5803_CTIME_256);
+
+		Serial.print("WaterTemp: ");
+		Serial.println(watertemperature, DEC);
+		Serial.print("Pressure: ");
+		Serial.println(pressure, DEC);
+	}
+
+	// Get Current
+	current = readCurrent();
+	Serial.print("Current: ");
+	Serial.println(current, DEC);
+
+	// Get Voltage
+	voltage = readBattVoltage();
+	Serial.print("Voltage: ");
+	Serial.println(voltage, DEC);
+}
+
+void checkSensors()
+{
+	// Check IMU available
+	CMPS11_getPitch();
+	if (twi_Error_code())
+		Reg_Sensors &= ~REG_SENSORS_CMPS11;
+	else
+		Reg_Sensors |= REG_SENSORS_CMPS11;
+
+	// Check Pressure available
+	MS5803_RESET();
+	if (twi_Error_code())
+		Reg_Sensors &= ~REG_SENSORS_MS5803;
+	else
+		Reg_Sensors |= REG_SENSORS_MS5803;
+}
+
+void initDepth()
+{
+	depth_SENS = MS5803_read_SENS();
+	delay(1);
+	depth_OFF = MS5803_read_OFF();
+	delay(1);
+	depth_TCS = MS5803_read_TCS();
+	delay(1);
+	depth_TCO = MS5803_read_TCO();
+	delay(1);
+	depth_TEMPS = MS5803_read_TEMPS();
+	delay(1);
+	depth_T = MS5803_read_T();
 }

@@ -6,7 +6,7 @@
 
 // COM Baud
 #define baudRate 9600
-#define baudRate1 115200
+#define baudRate1 9600
 
 // Pinout LinkIt One
 #define tx 0
@@ -50,8 +50,8 @@ EXTERN uint16_t voltage;
 EXTERN uint16_t current;
 EXTERN int32_t pressure;
 EXTERN int32_t  watertemperature;
-EXTERN int pitch;
-EXTERN int roll;
+EXTERN int8_t pitch;
+EXTERN int8_t roll;
 EXTERN uint16_t bearing;
 
 EXTERN uint8_t Reg_Sensors;

@@ -163,7 +163,7 @@ void loop()
 		onError();
 				
 					// DEBUG
-					getSensorData();
+					//getSensorData();
 	}
 }
 
@@ -270,6 +270,47 @@ void getSensorData()
 	voltage = readBattVoltage();
 	Serial.print("Voltage: ");
 	Serial.println(voltage, DEC);
+}
+
+void transmitSensorData()
+{
+	uint8_t txbuf[32];
+
+	txbuf[0] = startByte;
+	
+	// voltage 
+	txbuf[1] = voltage >> 8;
+	txbuf[2] = voltage & 0xFF;
+
+	// current
+	txbuf[3] = current >> 8;
+	txbuf[4] = current & 0xFF;
+
+	// pressure
+	txbuf[5] = pressure >> 8;
+	txbuf[6] = pressure & 0xFF;
+
+	// watertemp
+	txbuf[7] = (int16_t)(watertemperature / 10)>>8;
+	txbuf[8] = (int16_t)(watertemperature / 10) & 0xFF;
+
+	// bearing
+	txbuf[9] = bearing >> 8;
+	txbuf[10] = bearing & 0xFF;
+
+	// pitch
+	txbuf[11] = pitch;
+
+	// roll
+	txbuf[12] = roll;
+
+	// sensors found
+	txbuf[13] = Reg_Sensors;
+
+	// CRC
+	txbuf[14] = txbuf[1] ^ txbuf[2] ^ txbuf[3] ^ txbuf[4] ^ txbuf[5] ^ txbuf[6] ^ txbuf[7] ^ txbuf[8] ^ txbuf[9] ^ txbuf[10] ^ txbuf[11] ^ txbuf[12] ^ txbuf[13];
+
+	Serial1.write(txbuf, 15);
 }
 
 void checkSensors()

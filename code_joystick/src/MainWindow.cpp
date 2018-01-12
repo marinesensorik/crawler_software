@@ -9,9 +9,12 @@
 #define LEFT 8
 #define RIGHT 4
 #define STOP 16
+#define DEPTHCONVERSION 10.0
 
 QTime mtime(0,0,0);
 QFile logfile;
+double depthCorrection=0.0;
+uint32_t frameCount=0;
 
 MainWindow::MainWindow(QWidget* _parent) :
     QWidget(_parent)
@@ -211,9 +214,9 @@ void MainWindow::handleRoverConnection(){
     TxData(STOP, 0);
 
     connectedToRover = true;
-    createLogfile();
     ui.Msg_Box->setText("connected to crawler");
     printf("success!\n");
+    createLogfile();
     ui.connectToRoverButton->setDisabled(true);
   } else {
     connectedToRover = false;
@@ -268,6 +271,10 @@ void MainWindow::resetUI()
     ui.wTempBox->display(" ");
     ui.missionTimeBox->display(" ");
     ui.pressureBox->display(" ");
+    ui.currentBox->display(" ");
+    ui.bearingBox->display(" ");
+    ui.pitchBox->display(" ");
+    ui.rollBox->display(" ");
 }
 
 void MainWindow::TxData(uint8_t dat1, uint8_t dat2)
@@ -286,8 +293,80 @@ void MainWindow::TxData(uint8_t dat1, uint8_t dat2)
 
 void MainWindow::readData()
 {
+    double voltage=0;
+    double current=0;
+    double pressure=0;
+    double watertemp=0;
+    double bearing=0;
+    int pitch=0;
+    int roll=0;
+    int sensors=0;
+
+    uint16_t rawvoltage=0;
+    uint16_t rawcurrent=0;
+    uint16_t rawpressure=0;
+    int16_t rawwatertemp=0;
+    uint16_t rawbearing=0;
+    int8_t rawpitch=0;
+    int8_t rawroll=0;
+    uint8_t rawsensors=0;
+    uint8_t rawcrc=0;
+    uint8_t crc=0;
+
     QByteArray rxdata = socket->readAll();
     printf("RX: " + rxdata + '\n');
+    writeLog(rxdata);
+
+    if(rxdata[0]==(char)STARTBYTE)
+    {
+       rawvoltage = (rxdata[1]<<8 | rxdata[2]);
+       rawcurrent = (rxdata[3]<<8 | rxdata[4]);
+       rawpressure = (rxdata[5]<<8 | rxdata[6]);
+       rawwatertemp = (rxdata[7]<<8 | rxdata[8]);
+       rawbearing = (rxdata[9]<<8 | rxdata[10]);
+       rawpitch = rxdata[11];
+       rawroll = rxdata[12];
+       rawsensors = rxdata[13];
+       rawcrc=rxdata[14];
+       crc=rxdata[1] xor rxdata[2] xor rxdata[3] xor rxdata[4] xor rxdata[5] xor rxdata[6] xor rxdata[7] xor rxdata[8] xor rxdata[9] xor rxdata[10] xor rxdata[11] xor rxdata[12] xor rxdata[13];
+
+       if(rawcrc==crc)
+       {
+           printf("RX Data valid!\r\n");
+           voltage=rawvoltage/1000.0;
+           current=rawcurrent/1000.0;
+           pressure=rawpressure/1000.0;
+           watertemp=rawwatertemp*100.0;
+           bearing=rawbearing/10.0;
+           pitch=rawpitch;
+           roll=rawroll;
+           sensors=rawsensors;
+
+           if(frameCount == 10)
+           {
+               depthCorrection=pressure*DEPTHCONVERSION;
+               printf("Depth Correction set to: %f", depthCorrection);
+           }
+
+           // Refresh UI
+           ui.voltageBox->display(voltage);
+           ui.currentBox->display(current);
+           ui.pressureBox->display(pressure);
+           ui.depthBox->display((pressure*DEPTHCONVERSION-depthCorrection));
+           ui.wTempBox->display(watertemp);
+           ui.bearingBox->display(bearing);
+           ui.pitchBox->display(pitch);
+           ui.rollBox->display(roll);
+
+           // ToDo: Save to Log
+
+           frameCount++;
+       }
+       else
+       {
+           printf("RX Data invalid!\r\n");
+       }
+    }
 }
 
 void MainWindow::createLogfile()
@@ -303,9 +382,13 @@ void MainWindow::createLogfile()
         filename="logfile_"+curDate.toString("yyyy_dd_MM_")+QVariant(filecount).toString()+".txt";
     }
     printf(filename.toLatin1().constData());
+    printf("\n");
+    ui.logfileBox->setText(filename);
 
     logfile.setFileName(filename);
     QString header = "Crawler Control Center Logfile\n"+curDate.toString("yyyy_dd_MM ")+QTime().currentTime().toString("hh:mm:ss")+"\n**********\n";
+    QString dataheader = "Sample\tVoltage/V\tCurrent/A\tPressure/bar\tDepth/m\tWaterTemp./°C\tBearing/°\tPitch/°\tRoll/°\tSensors\t";
+    header=header+dataheader;
     if (logfile.open(QIODevice::WriteOnly | QIODevice::Text)) {
            QTextStream stream(&logfile);
            stream << header << endl;

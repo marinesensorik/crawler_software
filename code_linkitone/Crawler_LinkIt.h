@@ -5,7 +5,7 @@
 #endif // !EXTERN
 
 // COM Baud
-#define baudRate 9600
+#define baudRate 115200
 #define baudRate1 9600
 
 // Pinout LinkIt One

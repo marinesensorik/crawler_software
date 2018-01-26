@@ -51,6 +51,8 @@ void setup()
 	pitch=0;
 	roll=0;
 	bearing=0;
+	serialFlag = 0;
+	zustand = 1;
 
 	pinMode(dirR, OUTPUT);
 	pinMode(dirL, OUTPUT);
@@ -78,11 +80,18 @@ void setup()
 
 void loop()
 {
-	serialFlag = 0;
-	zustand = 1;
+	//serialFlag = 0;
+	//zustand = 1;
 
 	// COM Handler Serial1
-	while (Serial1.available() > 0 && serialFlag == 0) 
+
+	// DEBUG: UART Monitor
+	//while (Serial1.available())
+	//{
+	//	Serial.println(Serial1.read());
+	//}
+
+	while (Serial1.available() > 0) 
 	{
 		incomingByte = Serial1.read();
 
@@ -150,8 +159,9 @@ void loop()
 	{
 		// Motor Control
 		driveCrawler(movement, velocity);
-
 		serialFlag = 0;
+		getSensorData();
+		transmitSensorData();
 	}
 
 	// Timeout
@@ -161,9 +171,10 @@ void loop()
 		timer = timeStamp;
 		Serial.println("Timeout");
 		onError();
-				
-					// DEBUG
-					//getSensorData();
+		
+		// Transmit Sensor Data
+		getSensorData();
+		transmitSensorData();
 	}
 }
 
@@ -311,6 +322,7 @@ void transmitSensorData()
 	txbuf[14] = txbuf[1] ^ txbuf[2] ^ txbuf[3] ^ txbuf[4] ^ txbuf[5] ^ txbuf[6] ^ txbuf[7] ^ txbuf[8] ^ txbuf[9] ^ txbuf[10] ^ txbuf[11] ^ txbuf[12] ^ txbuf[13];
 
 	Serial1.write(txbuf, 15);
+	Serial.write(txbuf, 15);
 }
 
 void checkSensors()

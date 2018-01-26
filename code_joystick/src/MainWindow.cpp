@@ -15,6 +15,7 @@ QTime mtime(0,0,0);
 QFile logfile;
 double depthCorrection=0.0;
 uint32_t frameCount=0;
+QByteArray rxdata;
 
 MainWindow::MainWindow(QWidget* _parent) :
     QWidget(_parent)
@@ -57,12 +58,6 @@ MainWindow::MainWindow(QWidget* _parent) :
   QTimer *secTimer = new QTimer(this);
   connect(secTimer, SIGNAL(timeout()), this, SLOT(secTimer_timeout()));
   secTimer->start(1000);
-
-  payload.resize(4);
-  payload[0] = STARTBYTE;
-  payload[1] = STOP;
-  payload[2] = 0;
-  payload[3] = STARTBYTE xor STOP;
 
   connectedToRover = false;
 
@@ -277,30 +272,39 @@ void MainWindow::resetUI()
     ui.rollBox->display(" ");
 }
 
-void MainWindow::TxData(uint8_t dat1, uint8_t dat2)
+void MainWindow::TxData(int dat1, int dat2)
 {
+    QByteArray payload;
+    payload.resize(4);
+
     if(connectedToRover)
     {
         payload[0] = STARTBYTE;
         payload[1] = dat1;
         payload[2] = dat2;
-        payload[3] = payload[0] xor payload[1] xor payload[2];
+        payload[3] = (payload[1] xor payload[2]);
+
         socket->write(payload);
-        socket->waitForBytesWritten(1000);
+        socket->waitForBytesWritten(3000);
+
         printf("TX: %d %d %d %d\n", (uint8_t)payload[0], (uint8_t)payload[1], (uint8_t)payload[2],(uint8_t) payload[3]);
     }
 }
 
 void MainWindow::readData()
 {
+    static int state=0;
+    static int cnt=0;
+
     double voltage=0;
     double current=0;
     double pressure=0;
     double watertemp=0;
     double bearing=0;
-    int pitch=0;
-    int roll=0;
-    int sensors=0;
+    double depth=0;
+    int8_t pitch=0;
+    int8_t roll=0;
+    int8_t sensors=0;
 
     uint16_t rawvoltage=0;
     uint16_t rawcurrent=0;
@@ -313,34 +317,58 @@ void MainWindow::readData()
     uint8_t rawcrc=0;
     uint8_t crc=0;
 
-    QByteArray rxdata = socket->readAll();
-    printf("RX: " + rxdata + '\n');
-    writeLog(rxdata);
+    // Error handling
+    //if(!socket->waitForReadyRead(3000))
+    //{
+    //   printf("Socket Read Error...");
+    //    return;
+    //}
 
-    if(rxdata[0]==(char)STARTBYTE)
+    int readsize=socket->bytesAvailable();
+    rxdata.append(socket->readAll());
+
+    if(state==0 && rxdata[0]==(char)STARTBYTE)
     {
-       rawvoltage = (rxdata[1]<<8 | rxdata[2]);
-       rawcurrent = (rxdata[3]<<8 | rxdata[4]);
-       rawpressure = (rxdata[5]<<8 | rxdata[6]);
-       rawwatertemp = (rxdata[7]<<8 | rxdata[8]);
-       rawbearing = (rxdata[9]<<8 | rxdata[10]);
-       rawpitch = rxdata[11];
-       rawroll = rxdata[12];
-       rawsensors = rxdata[13];
+       state=1;
+       cnt+=readsize;
+       if(cnt>=15)
+           state=2;
+    }
+    else if(state==1)
+    {
+       cnt+=readsize;
+       if(cnt>=15)
+           state=2;
+    }
+
+    if(state==2)
+    {
+       state=0;
+       cnt=0;
+
+       rawvoltage = (rxdata[1]<<8 | rxdata[2]&0xFF);
+       rawcurrent = (rxdata[3]<<8 | rxdata[4]&0xFF);
+       rawpressure = (rxdata[5]<<8 | rxdata[6]&0xFF);
+       rawwatertemp = (rxdata[7]<<8 | rxdata[8]&0xFF);
+       rawbearing = (rxdata[9]<<8 | rxdata[10]&0xFF);
+       rawpitch = rxdata[11]&0xFF;
+       rawroll = rxdata[12]&0xFF;
+       rawsensors = rxdata[13]&0xFF;
        rawcrc=rxdata[14];
        crc=rxdata[1] xor rxdata[2] xor rxdata[3] xor rxdata[4] xor rxdata[5] xor rxdata[6] xor rxdata[7] xor rxdata[8] xor rxdata[9] xor rxdata[10] xor rxdata[11] xor rxdata[12] xor rxdata[13];
 
        if(rawcrc==crc)
        {
            printf("RX Data valid!\r\n");
-           voltage=rawvoltage/1000.0;
-           current=rawcurrent/1000.0;
-           pressure=rawpressure/1000.0;
-           watertemp=rawwatertemp*100.0;
-           bearing=rawbearing/10.0;
+           voltage=(double)rawvoltage/1000.0;
+           current=(double)rawcurrent/1000.0;
+           pressure=(double)rawpressure/1000.0;
+           watertemp=(double)rawwatertemp*100.0;
+           bearing=(double)rawbearing/10.0;
            pitch=rawpitch;
            roll=rawroll;
            sensors=rawsensors;
+           depth=pressure*DEPTHCONVERSION-depthCorrection;
 
            if(frameCount == 10)
            {
@@ -352,19 +380,30 @@ void MainWindow::readData()
            ui.voltageBox->display(voltage);
            ui.currentBox->display(current);
            ui.pressureBox->display(pressure);
-           ui.depthBox->display((pressure*DEPTHCONVERSION-depthCorrection));
+           ui.depthBox->display(depth);
            ui.wTempBox->display(watertemp);
            ui.bearingBox->display(bearing);
            ui.pitchBox->display(pitch);
            ui.rollBox->display(roll);
 
-           // ToDo: Save to Log
+           // Save to Log
+           QString logme=QVariant(frameCount).toString()+"\t"+QVariant(voltage).toString()+"\t"+QVariant(current).toString()+"\t"+QVariant(pressure).toString()+"\t"+QVariant(depth).toString()+"\t"+QVariant(watertemp).toString()+"\t"+QVariant(bearing).toString()+"\t"+QVariant(pitch).toString()+"\t"+QVariant(roll).toString()+"\t"+QVariant(sensors).toString();
+           writeLog(logme);
 
            frameCount++;
+
+           rxdata.clear();
+           cnt=0;
+           state=0;
        }
+
        else
        {
            printf("RX Data invalid!\r\n");
+           socket->readAll();
+           rxdata.clear();
+           cnt=0;
+           state=0;
        }
     }
 }

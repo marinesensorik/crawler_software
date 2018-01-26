@@ -42,7 +42,7 @@ private:
 
   void initJoystick();
   void resetUI();
-  void TxData(uint8_t dat1, uint8_t dat2);
+  void TxData(int dat1, int dat2);
   void createLogfile();
   void writeLog(QString entry);
 
@@ -59,7 +59,6 @@ private:
   QList<joydata*> joystick;
   QTimer *joyTimer;
   bool connectedToRover;
-  QByteArray payload;
 };
 
 #endif

@@ -230,7 +230,7 @@ uint16_t readBattVoltage()
 {
 	double vol = 0;
 	uint16_t val = analogRead(batt_voltage);
-	vol = val*ADC_RES_mV*4.0;
+	vol = val*ADC_RES_mV*4.5;						// LinkIt One OnBoard Voltage Divider 
 	return (uint16_t)vol;
 }
 

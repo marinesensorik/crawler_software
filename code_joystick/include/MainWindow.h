@@ -11,6 +11,9 @@
 #include <QDir>
 #include <QFile>
 #include <QDate>
+#include <QtMultimedia/QMediaPlayer>
+#include <QtMultimediaWidgets/QVideoWidget>
+#include <QtMultimediaWidgets/qvideowidget.h>
 
 #include "ui_mainwindow.h"
 

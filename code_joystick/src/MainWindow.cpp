@@ -25,7 +25,7 @@ MainWindow::MainWindow(QWidget* _parent) :
 
   QPixmap myPixmapForNow;
       if(!myPixmapForNow.load("icbm_logo.png")){
-          qWarning("Failed to load");
+          qWarning("Failed to load icon");
       }
   ui.label_8->setPixmap(myPixmapForNow);
   this->setWindowIcon(myPixmapForNow);
@@ -66,6 +66,20 @@ MainWindow::MainWindow(QWidget* _parent) :
   if(joysavail > 0){
      connect(joyTimer,SIGNAL(timeout()),this,SLOT(updateData()));
   }
+
+  // Create Video Frame
+  /*
+  QMediaPlayer *mp = new QMediaPlayer(0,0);
+  QMediaContent *mc = new QMediaContent(QUrl("http://192.168.1.142:81/videostream.cgi?user=admin&pwd=&14490603061510.9884033848065883"));
+  //QMediaContent *mc = new QMediaContent(QUrl::fromLocalFile("D:/20171010-VideoRay_CHV.MPG"));
+  mp->setMedia(*mc);
+  QVideoWidget *vw = new QVideoWidget(ui.videoframe);
+  vw->setMaximumSize(704, 576);
+  vw->setMinimumSize(704, 576);
+
+  mp->setVideoOutput(vw);
+  vw->show();
+  mp->play();*/
 }
 
 MainWindow::~MainWindow(){

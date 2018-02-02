@@ -33,7 +33,13 @@ FIND_PACKAGE(Qt5SerialPort
 		REQUIRED )		
 
 FIND_PACKAGE(Qt5Network 
-		REQUIRED )	
+                REQUIRED )
+
+FIND_PACKAGE(Qt5Multimedia
+                REQUIRED )
+
+FIND_PACKAGE(Qt5MultimediaWidgets
+                REQUIRED )
 
 FIND_LIBRARY(SDL_LIB NAMES 
 				SDL
@@ -67,6 +73,6 @@ ADD_EXECUTABLE(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${MOC_HEADERS} ${UI_FILES} 
 
 # last thing we have to do is to tell CMake what libraries our executable needs,
 # luckily FIND_PACKAGE prepared QT_LIBRARIES variable for us:
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::SerialPort Qt5::Network ${SDL_LIB})
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::SerialPort Qt5::Network Qt5::Multimedia Qt5::MultimediaWidgets ${SDL_LIB})
 
 

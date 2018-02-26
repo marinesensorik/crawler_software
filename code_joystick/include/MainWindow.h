@@ -14,7 +14,6 @@
 #include <QtMultimedia/QMediaPlayer>
 #include <QtMultimediaWidgets/QVideoWidget>
 #include <QtMultimediaWidgets/qvideowidget.h>
-
 #include "ui_mainwindow.h"
 
 class MainWindow : public QWidget {

@@ -115,21 +115,31 @@ void MainWindow::updateData(){
         }
       }
 
+      // TEST!!! Direction change only if no fwdbwd Motion detected
       if(leftRightValue > 0){
-        if(abs(leftRightValue) > AXIS_THRESHOLD){
+        if(abs(leftRightValue) > AXIS_THRESHOLD && abs(forwardBackwardValue)<AXIS_THRESHOLD){
           printf("right: %i\n",joystick.at(current_joystick)->axis[0]);
          if(connectedToRover){
             TxData(RIGHT, (uint8_t)sendValueLR);
           }
         }
       } else {
-        if(abs(leftRightValue) > AXIS_THRESHOLD){
+        if(abs(leftRightValue) > AXIS_THRESHOLD && abs(forwardBackwardValue)<AXIS_THRESHOLD){
           printf("left: %i\n",joystick.at(current_joystick)->axis[0]);
           if(connectedToRover){
             TxData(LEFT, (uint8_t)sendValueLR);
           }
         }
       }
+
+      // TEST!!!
+      if(abs(forwardBackwardValue<AXIS_THRESHOLD && abs(leftRightValue)<AXIS_THRESHOLD))
+      {
+          // No Joystick Movement, Stop
+          printf("No Movement Detected Stop");
+          TxData(STOP,0);
+      }
+
     } else {
       printf("--- Emergency Stop! ---- \n");
         if(connectedToRover){

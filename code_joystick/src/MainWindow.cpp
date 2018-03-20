@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 #define SERVER_PORT 8888
-#define AXIS_THRESHOLD 5000
+#define AXIS_THRESHOLD 15000
 #define STARTBYTE 240
 #define FORWARD 1
 #define BACKWARD 2
@@ -133,10 +133,10 @@ void MainWindow::updateData(){
       }
 
       // TEST!!!
-      if(abs(forwardBackwardValue<AXIS_THRESHOLD && abs(leftRightValue)<AXIS_THRESHOLD))
+      if(abs(forwardBackwardValue)<AXIS_THRESHOLD && abs(leftRightValue)<AXIS_THRESHOLD)
       {
           // No Joystick Movement, Stop
-          printf("No Movement Detected Stop");
+          printf("no movement detected-stop\n");
           TxData(STOP,0);
       }
 
